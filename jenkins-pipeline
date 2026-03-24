@@ -1,0 +1,45 @@
+```
+pipeline {
+    agent any
+    environment {
+        SONAR_HOME = tool "sonar"
+    }
+    stages {
+        stage('clone code for github') {
+            steps {
+                git url: "https://github.com/sumair99166/jenkins-Mega-Project.git", branch: "main"
+            }
+        }
+        stage('sonarqube') {
+            steps {
+                withSonarQubeEnv("sonar") {
+                    sh "$SONAR_HOME/bin/sonar-scanner -Dsonar.projectName=wanderlust -Dsonar.projectKey=wanderlust"
+                }
+            }
+        }
+        stage('Owasp Dependency check') {
+            steps {
+                dependencyCheck additionalArguments: '--scan ./', odcInstallation: 'dc'
+                dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
+            }
+        }
+        stage('sonar quality gate check') {
+            steps {
+                timeout(time: 2, unit: "MINUTES"){
+                    waitForQualityGate abortPipeline: false
+                }
+            }
+        }
+        stage('Trivy file system scan') {
+            steps {
+                sh "trivy fs --format table -o trivy-fs-report.html ."
+            }
+        }
+        stage('Deploy by docker compose') {
+            steps {
+                sh "docker-compose up -d"
+            }
+        }
+    } 
+}
+```
